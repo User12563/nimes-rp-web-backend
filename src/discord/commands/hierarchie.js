@@ -8,7 +8,7 @@ import {
 } from "discord.js";
 
 // Correction du chemin : on remonte de deux niveaux pour atteindre la racine src/
-import Hierarchy from "../../models/Hierarchie.js";
+import { Hierarchie } from "../../models/Hierarchie.js";
 import { CONFIG } from "../config.js";
 import { buildHierarchyEmbed } from "../utils/hierarchy.js";
 import { logger } from "../../utils/logger.js";
