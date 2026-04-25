@@ -1,7 +1,7 @@
 import { EmbedBuilder } from "discord.js";
 import { CONFIG } from "../config.js";
 
-function buildFooter() {
+export function buildFooter() {   // ✅ EXPORT AJOUTÉ ICI
   return { text: CONFIG.FOOTER_TEXT, iconURL: CONFIG.FOOTER_ICON };
 }
 
