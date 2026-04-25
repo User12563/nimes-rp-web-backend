@@ -3,7 +3,7 @@ import passport from "passport";
 import { Strategy as DiscordStrategy } from "passport-discord";
 import StaffUser from "../models/StaffUser.js";
 import { ROLE_PERMISSIONS } from "../config/permissions.js";
-import { getMemberRoles } from "../discordBot.js";
+import { getMemberRoles } from "../discord/utils/member.js";
 import axios from "axios";
 
 const router = express.Router();

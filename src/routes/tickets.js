@@ -7,7 +7,7 @@ import { io } from "../server.js";
 import { auth } from "../middleware/auth.js";
 import { requirePermission } from "../middleware/requirePermission.js";
 import { logger } from "../utils/logger.js";
-import { notifyNewTicket } from "../discordBot.js";
+import { getMemberRoles } from "../discord/utils/tickets.js";
 
 const router = express.Router();
 
