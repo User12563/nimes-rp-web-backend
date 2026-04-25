@@ -10,7 +10,7 @@ import {
 // Correction du chemin : on remonte de deux niveaux pour atteindre la racine src/
 import Hierarchy from "../../models/Hierarchie.js";
 import { CONFIG } from "../config.js";
-import { buildHierarchyEmbed } from "../utils/hierarchy.js";
+import { buildHierarchyEmbed } from "../utils/hierarchie.js";
 import { logger } from "../../utils/logger.js";
 
 export default {

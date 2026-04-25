@@ -3,7 +3,7 @@ import { getPseudoAutocomplete } from "../utils/autocomplete.js";
 import { getCollabState } from "../utils/settings.js";
 import { getEmbedForCategory } from "../utils/embeds.js";
 import { CONFIG } from "../config.js";
-import Hierarchy from "../../models/Hierarchy.js";
+import Hierarchy from "../../models/Hierarchie.js";
 import { buildHierarchyEmbed } from "../utils/embeds.js";
 
 export default {
