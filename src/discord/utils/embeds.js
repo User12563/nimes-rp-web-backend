@@ -134,3 +134,36 @@ export function getEmbedForCategory(category, collabState) {
         .setTimestamp(ts);
   }
 }
+
+
+export function buildHierarchyEmbed(category, guild) {
+  const ts = new Date();
+
+  const embed = new EmbedBuilder()
+    .setColor(0x2b2d31)
+    .setTitle(`📌 ${category.name}`)
+    .setThumbnail(CONFIG.THUMBNAIL_GIF)
+    .setFooter(buildFooter())
+    .setTimestamp(ts);
+
+  if (!category.roles || category.roles.length === 0) {
+    return embed.setDescription("Aucun grade enregistré dans cette catégorie.");
+  }
+
+  for (const role of category.roles) {
+    const discordRole = guild.roles.cache.get(role.id);
+
+    const roleName = discordRole ? discordRole.name : role.name;
+    const memberCount = discordRole ? discordRole.members.size : 0;
+
+    embed.addFields({
+      name: `🎖️ ${roleName}`,
+      value:
+        `👥 **${memberCount} membre(s)**\n` +
+        (role.description ? `📝 ${role.description}` : "_Aucune description_"),
+      inline: false
+    });
+  }
+
+  return embed;
+}
