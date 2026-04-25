@@ -39,7 +39,7 @@ if (!mongoUri) {
   process.exit(1);
 }
 
-// ✅ CORS : autorisations frontales (ajoute d'autres origines si besoin)
+// ✅ CORS : autorisations frontales
 const allowedOrigins = [
   process.env.FRONTEND_URL || "http://localhost:5173",
   "https://www.nimesrp.fr",
@@ -95,12 +95,8 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // --- ROUTES API ---
-// Shadow en priorité (tests)
 app.use("/api/shadow", shadowRoutes);
-
-// Appliquer rate limiter sur /api
 app.use("/api", apiLimiter);
-
 app.use("/api/auth", authRoutes);
 app.use("/api/staff", staffRoutes);
 app.use("/api/logs/stats", logsStatsRoutes);
@@ -111,7 +107,6 @@ app.use("/api/notifications", notificationRoutes);
 
 app.get("/health", (req, res) => res.status(200).send("OK"));
 
-// Gestion d'erreurs (doit être en dernier)
 app.use(errorHandler);
 
 const server = http.createServer(app);
@@ -141,7 +136,8 @@ cron.schedule("*/15 * * * *", async () => {
   const safeDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
   try {
-    const discordModule = await import("./src/discord/index.js");
+    // ✅ Correction 1 & 3 : Import et Client
+    const discordModule = await import("./discord/index.js");
     const discordClient = discordModule.client;
 
     if (!discordClient || typeof discordClient.isReady !== "function" || !discordClient.isReady()) {
@@ -192,7 +188,6 @@ async function startServer() {
     await mongoose.connect(mongoUri);
     logger.info("✅ MongoDB Atlas : Connecté");
 
-    // Anti-spam notifications au démarrage
     const cleanResult = await Log.updateMany(
       { adminNotified: { $ne: true } },
       { $set: { adminNotified: true } }
@@ -205,14 +200,15 @@ async function startServer() {
 
     if (process.env.DISCORD_BOT_TOKEN) {
       try {
-        const discordModule = await import("./src/discord/index.js");
+        // ✅ Correction 2 : Import et initBot
+        const discordModule = await import("./discord/index.js");
         const initBot = discordModule.initBot || discordModule.default?.initBot;
 
         if (typeof initBot === "function") {
           initBot(io);
-          logger.info("✅ initBot appelé avec succès (src/discord/index.js)");
+          logger.info("✅ initBot appelé avec succès (discord/index.js)");
         } else {
-          logger.warn("initBot introuvable dans ./src/discord/index.js — vérifie les exports");
+          logger.warn("initBot introuvable dans ./discord/index.js — vérifie les exports");
         }
       } catch (err) {
         logger.error("Erreur lors de l'import du module Discord :", err);
