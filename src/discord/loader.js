@@ -19,9 +19,10 @@ export default async function loadBot(client) {
     if (!file.endsWith(".js")) continue;
 
     const cmd = (await import(`./commands/${file}`)).default;
-
-    client.commands.set(cmd.data.name, cmd);
-    slashData.push(cmd.data.toJSON());
+    if (cmd && cmd.data) {
+      client.commands.set(cmd.data.name, cmd);
+      slashData.push(cmd.data.toJSON());
+    }
   }
 
   // -----------------------------
@@ -34,8 +35,9 @@ export default async function loadBot(client) {
     if (!file.endsWith(".js")) continue;
 
     const evt = (await import(`./events/${file}`)).default;
-
-    client.on(evt.name, (...args) => evt.execute(client, ...args));
+    if (evt && evt.name) {
+      client.on(evt.name, (...args) => evt.execute(client, ...args));
+    }
   }
 
   // -----------------------------
@@ -44,23 +46,28 @@ export default async function loadBot(client) {
   const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_BOT_TOKEN);
 
   try {
-    // On utilise l'ID du .env plutôt que client.user.id qui est null au démarrage
-    const clientId = process.env.DISCORD_CLIENT_ID;
-    const guildId = process.env.DISCORD_GUILD_ID;
+    const clientId = process.env.DISCORD_CLIENT_ID || process.env.CLIENT_ID;
+    const guildId = process.env.DISCORD_GUILD_ID || process.env.GUILD_ID;
 
     if (!clientId) {
-      throw new Error("DISCORD_CLIENT_ID est manquant dans le .env");
+      console.error("❌ DISCORD_CLIENT_ID est manquant dans le .env");
+      return;
     }
 
+    // --- NETTOYAGE DES DOUBLONS ---
+    // On vide les commandes globales pour ne garder que celles du serveur
+    await rest.put(Routes.applicationCommands(clientId), { body: [] });
+    console.log("🧹 Commandes globales nettoyées (évite les doublons)");
+
     if (guildId) {
-      // Déploiement local (instantané sur ton serveur)
+      // Déploiement sur ton serveur spécifique (Instantané)
       await rest.put(
         Routes.applicationGuildCommands(clientId, guildId),
         { body: slashData }
       );
-      console.log("✔️ Commandes slash déployées sur le serveur (Guild)");
+      console.log(`✔️ Commandes slash déployées sur le serveur : ${guildId}`);
     } else {
-      // Déploiement global (si pas de Guild ID)
+      // Si pas de Guild ID, on déploie en global
       await rest.put(
         Routes.applicationCommands(clientId),
         { body: slashData }
