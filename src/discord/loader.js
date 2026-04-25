@@ -44,12 +44,30 @@ export default async function loadBot(client) {
   const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_BOT_TOKEN);
 
   try {
-    await rest.put(
-      Routes.applicationCommands(client.user.id),
-      { body: slashData }
-    );
+    // On utilise l'ID du .env plutôt que client.user.id qui est null au démarrage
+    const clientId = process.env.DISCORD_CLIENT_ID;
+    const guildId = process.env.DISCORD_GUILD_ID;
 
-    console.log("✔️ Commandes slash déployées");
+    if (!clientId) {
+      throw new Error("DISCORD_CLIENT_ID est manquant dans le .env");
+    }
+
+    if (guildId) {
+      // Déploiement local (instantané sur ton serveur)
+      await rest.put(
+        Routes.applicationGuildCommands(clientId, guildId),
+        { body: slashData }
+      );
+      console.log("✔️ Commandes slash déployées sur le serveur (Guild)");
+    } else {
+      // Déploiement global (si pas de Guild ID)
+      await rest.put(
+        Routes.applicationCommands(clientId),
+        { body: slashData }
+      );
+      console.log("✔️ Commandes slash déployées globalement");
+    }
+
   } catch (err) {
     console.error("❌ Erreur déploiement commandes :", err);
   }
