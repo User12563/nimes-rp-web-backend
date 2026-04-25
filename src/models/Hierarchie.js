@@ -20,4 +20,13 @@ const HierarchieSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-export const Hierarchie = mongoose.model("Hierarchie", HierarchieSchema);
+// On définit le modèle
+const Hierarchie = mongoose.models.Hierarchie || mongoose.model("Hierarchie", HierarchieSchema);
+
+// --- LES EXPORTS (Pour réconcilier tout ton projet) ---
+
+// Permet : import { Hierarchie } from "..." (utilisé dans ta commande)
+export { Hierarchie };
+
+// Permet : import Hierarchy from "..." (utilisé dans interactionCreate.js)
+export default Hierarchie;
