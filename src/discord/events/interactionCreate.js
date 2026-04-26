@@ -4,6 +4,7 @@ import { getCollabState } from "../utils/settings.js";
 import { getEmbedForCategory } from "../utils/embeds.js";
 import { CONFIG } from "../config.js";
 import Hierarchy from "../../models/Hierarchie.js";
+import Log from "../../models/Logs.js"; // Import indispensable pour la justification
 import { buildHierarchyEmbed } from "../utils/embeds.js";
 
 export default {
@@ -66,7 +67,7 @@ export default {
           });
         }
 
-        // Menu déroulant
+        // Menu déroulant Hiérarchie
         if (interaction.isStringSelectMenu() && interaction.customId === "select_hierarchy") {
           await interaction.deferReply({ ephemeral: true });
 
@@ -88,16 +89,10 @@ export default {
             targetCat.roles
           );
 
-          logger.info(
-            `[HIERARCHY] Affichage réussi de ${targetCat.name} en ${
-              Date.now() - startTime
-            }ms`
-          );
-
           return interaction.editReply({ embeds: [embed] });
         }
 
-        // Bouton rafraîchir
+        // Bouton rafraîchir Hiérarchie
         if (interaction.isButton() && interaction.customId === "refresh_hierarchy") {
           const member = await interaction.guild.members.fetch(interaction.user.id);
           const hasPermission = member.roles.cache.some(role =>
@@ -115,7 +110,6 @@ export default {
 
           try {
             await interaction.guild.members.fetch({ force: true });
-            logger.info(`[CACHE] Rafraîchissement forcé par ${interaction.user.tag}`);
             return interaction.editReply({
               content: "✅ Cache des membres mis à jour avec succès !"
             });
@@ -127,7 +121,33 @@ export default {
           }
         }
       }
+
+      // 5. SYSTÈME DE JUSTIFICATION (NOUVEAU & CORRIGÉ)
+      if (interaction.isStringSelectMenu() && interaction.customId === 'select_justification') {
+        const [logId, raison] = interaction.values[0].split('|');
+
+        try {
+          const log = await Log.findById(logId);
+          if (!log) return interaction.update({ content: "❌ Log introuvable dans la base de données.", components: [] });
+
+          log.category = "JUSTIFIÉ";
+          log.action = `[JUSTIFIÉ] ${raison}`;
+          log.raw = `RAISON : ${raison} | ${log.raw}`;
+          
+          await log.save();
+
+          return interaction.update({ 
+            content: `✅ La sanction sur **${log.target}** a été justifiée avec succès !`, 
+            components: [] 
+          });
+        } catch (err) {
+          logger.error(`[JUSTIFICATION_ERROR] ${err.message}`);
+          return interaction.update({ content: "⚠️ Erreur lors de la sauvegarde de la justification.", components: [] });
+        }
+      }
+
     } catch (err) {
+      // GESTION DES ERREURS CRITIQUES
       logger.error(
         `[CRITICAL_ERROR] Interaction: ${
           interaction.customId || interaction.commandName
@@ -145,7 +165,9 @@ export default {
             content: "⚠️ Une erreur est survenue lors du traitement."
           });
         }
-      } catch {}
+      } catch (finalErr) {
+        logger.error(`[FATAL] Impossible de répondre à l'utilisateur: ${finalErr.message}`);
+      }
     }
   }
 };
