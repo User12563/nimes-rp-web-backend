@@ -4,7 +4,7 @@ import { auth } from "../middleware/auth.js";
 import { requirePermission } from "../middleware/requirePermission.js"; // Import manquant ajouté
 import { client as discordClient } from "../discord/index.js"; // On utilise l'alias discordClient
 // ✅ NOUVELLE LIGNE (le bon chemin vers le dossier discord) :
-import { warnAlert } from "../discord/utils/warnAlert.js";
+import { checkAndNotifyWarn } from "../discord/utils/warnAlert.js";
 const router = express.Router();
 
 // Configuration des IDs de rôles Discord
