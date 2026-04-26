@@ -111,15 +111,16 @@ export const io = new Server(server, {
 const LOG_CHANNEL_ID = process.env.LOG_CHANNEL_ID;
 const SUPER_ADMIN_CHANNEL_ID = process.env.SUPER_ADMIN_CHANNEL_ID;
 
+// --- CRON JOB MODIFIÉ (Ban uniquement) ---
 cron.schedule("*/15 * * * *", async () => {
   if (!discordClient?.isReady()) return;
 
-  const limitDate = new Date(Date.now() - 3 * 60 * 60 * 1000);
-  const safeDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const limitDate = new Date(Date.now() - 3 * 60 * 60 * 1000); // 3h d'ancienneté
+  const safeDate = new Date(Date.now() - 24 * 60 * 60 * 1000); // Pas plus de 24h
 
   try {
     const oldLogs = await Log.find({
-      type: { $in: ["ban", "kick"] },
+      type: "ban", // 🎯 MODIFICATION ICI : On a enlevé le $in et "kick"
       category: { $ne: "JUSTIFIÉ" },
       adminNotified: { $ne: true },
       createdAt: { $lt: limitDate, $gt: safeDate }
@@ -135,11 +136,12 @@ cron.schedule("*/15 * * * *", async () => {
       
       const channel = await discordClient.channels.fetch(targetChannelId);
       if (channel) {
-          await channel.send(`🚨 **RELIQUAT**\n${isMod ? 'Modérateur' : 'Admin'} **${log.author}** n'a pas justifié son action contre **${log.target}**.`);
+          // On a aussi simplifié le message pour ne parler que de Ban
+          await channel.send(`🚨 **RELIQUAT : BAN NON JUSTIFIÉ**\n${isMod ? 'Modérateur' : 'Admin'} **${log.author}** n'a pas justifié son bannissement sur **${log.target}**.`);
       }
     }
   } catch (err) {
-    logger.error("Erreur Cron:", err);
+    logger.error("Erreur Cron (Ban check):", err);
   }
 });
 
