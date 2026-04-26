@@ -3,8 +3,7 @@ import StaffUser from "../models/StaffUser.js";
 import { auth } from "../middleware/auth.js";
 import { requirePermission } from "../middleware/requirePermission.js"; // Import manquant ajouté
 import { client as discordClient } from "../discord/index.js"; // On utilise l'alias discordClient
-import { checkAndNotifySuperAdmins } from "../utils/warnAlert.js"; // On utilise l'utilitaire créé
-
+import { warnAlert } from "../utils/warnAlert.js";
 const router = express.Router();
 
 // Configuration des IDs de rôles Discord
