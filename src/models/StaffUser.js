@@ -32,6 +32,12 @@ const staffUserSchema = new mongoose.Schema({
         default: "MODERATEUR" 
     },
 
+    warns: [{
+    reason: String,
+    by: String, // Pseudo du staff qui a warn
+    date: { type: Date, default: Date.now }
+    }],
+
     // --- GESTION ÉQUIPE & NOTES ---
     status: { 
         type: String, 

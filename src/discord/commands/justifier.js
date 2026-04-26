@@ -13,7 +13,7 @@ export default {
         .setName('justifier')
         .setDescription('Justifier vos sanctions sur un joueur')
         .addStringOption(option => 
-            option.setName('target')
+            option.setName('cible')
                 .setDescription('Le pseudo du joueur sanctionné')
                 .setRequired(true))
         .addStringOption(option => 
