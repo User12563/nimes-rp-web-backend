@@ -6,7 +6,7 @@ import {
     StringSelectMenuOptionBuilder 
 } from 'discord.js';
 import Log from "../../models/Logs.js";
-import StaffUser from '../models/StaffUser.js';
+import StaffUser from "../../models/StaffUser.js";
 
 export default {
     data: new SlashCommandBuilder()
