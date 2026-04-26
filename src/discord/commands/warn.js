@@ -1,6 +1,6 @@
 import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
 // Attention : on utilise l'utilitaire mis à jour qui prévient aussi la cible
-import { checkAndNotifyWarn } from '../../utils/warnAlert.js'; 
+import { checkAndNotifyWarn } from "../utils/warnAlert.js";
 import StaffUser from '../../models/StaffUser.js';
 
 export default {
