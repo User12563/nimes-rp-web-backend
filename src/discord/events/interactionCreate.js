@@ -2,7 +2,6 @@ import { logger } from "../../utils/logger.js";
 import { getPseudoAutocomplete } from "../utils/autocomplete.js";
 import { getCollabState } from "../utils/settings.js";
 import { getEmbedForCategory } from "../utils/embeds.js";
-import { CONFIG } from "../config.js";
 import Hierarchy from "../../models/Hierarchie.js";
 import Log from "../../models/Logs.js";
 import StaffUser from '../../models/StaffUser.js';
@@ -10,6 +9,20 @@ import Absence from '../../models/Absence.js';
 import { buildHierarchyEmbed } from "../utils/embeds.js";
 
 import { ActionRowBuilder, StringSelectMenuBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, EmbedBuilder } from 'discord.js';
+
+// ==========================================
+// 🛠️ CONFIGURATION DES IDS (À REMPLIR)
+// ==========================================
+const SETTINGS = {
+    ROLES: {
+        SERVICE: "1498250482802495600",     // ID du rôle "En Service"
+        ABSENT: "1498241578416734308",       // ID du rôle "Absent"
+        ADMINS: ["1381159291372830820", "1492493841696034867"]  // Liste des IDs rôles autorisés à refresh
+    },
+    CHANNELS: {
+        LOGS_ABSENCES: "1494594500511924425" // Ton salon de logs
+    }
+};
 
 export default {
   name: "interactionCreate",
@@ -41,7 +54,7 @@ export default {
         // --- LOGIQUE DE SERVICE (duty_on / duty_off) ---
         if (customId === 'duty_on' || customId === 'duty_off') {
           const staff = await StaffUser.findOne({ discordId: user.id });
-          if (!staff) return interaction.reply({ content: "❌ Vous n'êtes pas répertorié staff.", ephemeral: true });
+          if (!staff) return interaction.reply({ content: "❌ Vous n'êtes pas répertorié staff dans la base de données.", ephemeral: true });
 
           if (customId === 'duty_on') {
             if (staff.status === 'SERVICE') return interaction.reply({ content: "⚠️ Déjà en service !", ephemeral: true });
@@ -50,10 +63,11 @@ export default {
             staff.currentServiceStart = new Date();
             await staff.save();
             
-            // ✅ Rôle & Pseudo
+            // ✅ Mise à jour Rôle & Pseudo
             try { 
-                await member.roles.add(CONFIG.ROLES.SERVICE); 
+                await member.roles.add(SETTINGS.ROLES.SERVICE); 
                 if (member.manageable) await member.setNickname(`[SERV] ${user.username}`);
+                logger.info(`✅ Service ON pour ${user.tag}`);
             } catch (e) { logger.error("Erreur roles/pseudo duty_on: " + e.message); }
 
             return interaction.reply({ content: "🟢 **Service démarré.** Bon courage !", ephemeral: true });
@@ -70,10 +84,11 @@ export default {
             staff.lastServiceEnd = new Date();
             await staff.save();
 
-            // ✅ Rôle & Pseudo
+            // ✅ Mise à jour Rôle & Pseudo
             try { 
-                await member.roles.remove(CONFIG.ROLES.SERVICE); 
+                await member.roles.remove(SETTINGS.ROLES.SERVICE); 
                 if (member.manageable) await member.setNickname(user.username.replace("[SERV] ", ""));
+                logger.info(`✅ Service OFF pour ${user.tag}`);
             } catch (e) { logger.error("Erreur roles/pseudo duty_off: " + e.message); }
             
             return interaction.reply({ content: `🔴 **Service terminé.** (\`${Math.floor(durationMs / 60000)} min\` ajoutées)`, ephemeral: true });
@@ -82,11 +97,11 @@ export default {
 
         // --- REFRESH HIÉRARCHIE ---
         if (customId === "refresh_hierarchy") {
-          const hasPermission = member.roles.cache.some(role => CONFIG.ALLOWED_ADMIN_ROLES.includes(role.id));
+          const hasPermission = member.roles.cache.some(role => SETTINGS.ROLES.ADMINS.includes(role.id));
           if (!hasPermission) return interaction.reply({ content: "❌ Permission insuffisante.", ephemeral: true });
           await interaction.deferReply({ ephemeral: true });
           await interaction.guild.members.fetch({ force: true });
-          return interaction.editReply({ content: "✅ Cache mis à jour !" });
+          return interaction.editReply({ content: "✅ Cache des membres mis à jour !" });
         }
 
         // --- FORMULAIRE ABSENCE ---
@@ -106,16 +121,19 @@ export default {
 
         // --- SUPPRESSION / ARCHIVAGE ABSENCE ---
         if (customId === 'btn_delete_absence') {
-          // ✅ On ne récupère que les absences ACTIVES
           const userAbsences = await Absence.find({ discordId: user.id, status: "ACTIVE" }).sort({ createdAt: -1 });
 
           if (userAbsences.length === 0) return interaction.reply({ content: "❌ Aucune absence active trouvée.", ephemeral: true });
 
           if (userAbsences.length === 1) {
             const abs = userAbsences[0];
-            abs.status = "ARCHIVED"; // ✅ On archive au lieu de supprimer
+            abs.status = "ARCHIVED";
             await abs.save();
-            return interaction.reply({ content: `✅ Votre absence du ${abs.startDate} a été marquée comme archivée.`, ephemeral: true });
+
+            // ✅ Optionnel : On retire le rôle absent quand il archive
+            try { await member.roles.remove(SETTINGS.ROLES.ABSENT); } catch(e) {}
+
+            return interaction.reply({ content: `✅ Votre absence du ${abs.startDate} a été archivée.`, ephemeral: true });
           }
 
           const selectMenu = new StringSelectMenuBuilder()
@@ -127,7 +145,7 @@ export default {
                   value: abs._id.toString()
               })));
 
-          return interaction.reply({ content: "Choisissez l'absence à annuler/archiver :", components: [new ActionRowBuilder().addComponents(selectMenu)], ephemeral: true });
+          return interaction.reply({ content: "Choisissez l'absence à archiver :", components: [new ActionRowBuilder().addComponents(selectMenu)], ephemeral: true });
         }
       }
 
@@ -135,7 +153,6 @@ export default {
       if (interaction.isStringSelectMenu()) {
         const { values } = interaction;
 
-        // Choix du type -> Ouverture Modal
         if (customId === 'select_absence_type') {
             const modal = new ModalBuilder().setCustomId(`modal_absence|${values[0]}`).setTitle('Formulaire d\'absence');
             modal.addComponents(
@@ -146,16 +163,15 @@ export default {
             return await interaction.showModal(modal);
         }
 
-        // Action d'archivage via menu
         if (customId === 'select_delete_absence_action') {
             const abs = await Absence.findById(values[0]);
             if (!abs) return interaction.update({ content: "❌ Absence introuvable.", components: [] });
             abs.status = "ARCHIVED";
             await abs.save();
+            try { await member.roles.remove(SETTINGS.ROLES.ABSENT); } catch(e) {}
             return interaction.update({ content: `✅ Absence du ${abs.startDate} archivée.`, components: [] });
         }
 
-        // --- AUTRES MENUS (RP, Hiérarchie, Justification) ---
         if (customId === "rp_menu_select") {
             const collabState = await getCollabState();
             let selected = values[0] === "accueil" ? null : values[0];
@@ -163,13 +179,13 @@ export default {
         }
 
         if (customId === "select_hierarchy") {
-          await interaction.deferReply({ ephemeral: true });
-          const config = await Hierarchy.findOne({ messageId: interaction.message.id });
-          const index = parseInt(values[0].split("_")[1]);
-          const targetCat = config?.categories[index];
-          if (!targetCat) return interaction.editReply("❌ Erreur.");
-          const embed = await buildHierarchyEmbed(interaction.guild, targetCat.name, targetCat.roles);
-          return interaction.editReply({ embeds: [embed] });
+            await interaction.deferReply({ ephemeral: true });
+            const config = await Hierarchy.findOne({ messageId: interaction.message.id });
+            const index = parseInt(values[0].split("_")[1]);
+            const targetCat = config?.categories[index];
+            if (!targetCat) return interaction.editReply("❌ Erreur.");
+            const embed = await buildHierarchyEmbed(interaction.guild, targetCat.name, targetCat.roles);
+            return interaction.editReply({ embeds: [embed] });
         }
 
         if (customId === 'select_justification') {
@@ -201,8 +217,16 @@ export default {
                   status: "ACTIVE"
               });
 
+              // ✅ AJOUT DU RÔLE ABSENT IMMÉDIATEMENT
+              try {
+                  await member.roles.add(SETTINGS.ROLES.ABSENT);
+                  logger.info(`✅ Rôle absent appliqué à ${user.tag}`);
+              } catch (e) {
+                  logger.error("Erreur application rôle absent: " + e.message);
+              }
+
               // Log Discord
-              const logChannel = guild.channels.cache.get("1494594500511924425");
+              const logChannel = guild.channels.cache.get(SETTINGS.CHANNELS.LOGS_ABSENCES);
               if (logChannel) {
                   const embed = new EmbedBuilder()
                       .setTitle('📅 NOUVELLE ABSENCE')
@@ -212,11 +236,12 @@ export default {
                           { name: 'Type', value: `\`${type}\``, inline: true },
                           { name: 'Dates', value: `Du **${debut}** au **${fin}**` },
                           { name: 'Raison', value: motif }
-                      );
+                      )
+                      .setTimestamp();
                   await logChannel.send({ embeds: [embed] });
               }
 
-              return await interaction.reply({ content: '✅ Absence enregistrée ! Le rôle sera mis automatiquement par le système aux dates prévues.', ephemeral: true });
+              return await interaction.reply({ content: '✅ Absence enregistrée et rôle appliqué !', ephemeral: true });
           }
       }
 

@@ -1,21 +1,26 @@
 import express from 'express';
 const router = express.Router();
-import { isAuthenticated } from '../middlewares/auth.js';
-import StaffUser from '../models/StaffUser.js'; // Ton modèle Mongoose
-import { CONFIG } from '../config.js';
+import { isAuthenticated } from '../middleware/auth.js'; // Vérifie bien s'il y a un 's' à middleware
+import StaffUser from '../models/StaffUser.js';
 import { logger } from '../utils/logger.js';
 
+// ==========================================
+// 🛠️ CONFIGURATION DES IDS (À REMPLIR)
+// ==========================================
+const SERVICE_ROLE_ID = "1498250482802495600"; // 👈 Mets l'ID du rôle "En Service" ici
+const GUILD_ID = "1380978534167613611";          // 👈 Mets l'ID de ton serveur Discord ici
+
 router.post("/duty", isAuthenticated, async (req, res) => {
-    const { action } = req.body; // Attendu : "ON" ou "OFF"
+    const { action } = req.body; 
     const discordId = req.user.discordId;
 
     try {
-        // Récupération du client Discord (injecté dans app.js via app.set('discordClient', client))
         const discordClient = req.app.get('discordClient');
-        const guild = discordClient?.guilds.cache.get(process.env.GUILD_ID);
+        
+        // Utilisation de l'ID en dur pour la Guild
+        const guild = discordClient?.guilds.cache.get(GUILD_ID);
         const member = await guild?.members.fetch(discordId).catch(() => null);
 
-        // Recherche du staff dans ta collection StaffUser
         const staff = await StaffUser.findOne({ discordId });
 
         if (!staff) {
@@ -29,12 +34,16 @@ router.post("/duty", isAuthenticated, async (req, res) => {
             }
 
             staff.status = 'SERVICE';
-            staff.currentServiceStart = new Date(); // Utilise ton champ Schema
+            staff.currentServiceStart = new Date();
             await staff.save();
 
-            // Synchro Discord
+            // ✅ Synchro Discord : AJOUT DU RÔLE
             if (member) {
-                await member.roles.add(CONFIG.ROLES.SERVICE).catch(() => {});
+                // On utilise l'ID en dur ici
+                await member.roles.add(SERVICE_ROLE_ID).catch((err) => {
+                    logger.error(`Erreur ajout rôle service: ${err.message}`);
+                });
+
                 if (member.manageable) {
                     await member.setNickname(`[SERV] ${staff.username}`).catch(() => {});
                 }
@@ -48,23 +57,25 @@ router.post("/duty", isAuthenticated, async (req, res) => {
                 return res.status(400).json({ error: "Vous n'êtes pas en service actuellement." });
             }
 
-            // Calcul de la durée
             const now = new Date();
             const startTime = staff.currentServiceStart || now;
             const durationMs = now.getTime() - startTime.getTime();
 
-            // Mise à jour des statistiques de ton Schema
             staff.totalServiceTime += durationMs;
             staff.weeklyServiceTime += durationMs;
-            staff.status = 'ONLINE'; // Passe en ONLINE (ou OFFLINE selon ton choix)
+            staff.status = 'ONLINE'; 
             staff.currentServiceStart = null;
             staff.lastServiceEnd = now;
             
             await staff.save();
 
-            // Synchro Discord
+            // ✅ Synchro Discord : RETRAIT DU RÔLE
             if (member) {
-                await member.roles.remove(CONFIG.ROLES.SERVICE).catch(() => {});
+                // On utilise l'ID en dur ici
+                await member.roles.remove(SERVICE_ROLE_ID).catch((err) => {
+                    logger.error(`Erreur retrait rôle service: ${err.message}`);
+                });
+
                 if (member.manageable) {
                     const cleanNick = staff.username.replace("[SERV] ", "");
                     await member.setNickname(cleanNick).catch(() => {});

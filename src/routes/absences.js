@@ -5,12 +5,17 @@ import StaffUser from "../models/StaffUser.js";
 import { client as discordClient } from "../discord/index.js";
 import { EmbedBuilder } from "discord.js";
 import { logger } from "../utils/logger.js";
-// ✅ Import supprimé car le fichier n'existe pas
 
 const router = express.Router();
 
-// ID du rôle Absence (on le prend dans le .env ou on met l'ID direct)
-const ABSENCE_ROLE_ID = process.env.ABSENCE_ROLE_ID || "1498241578416734308";
+// ==========================================
+// 🛠️ CONFIGURATION DES IDS (À REMPLIR)
+// ==========================================
+const SETTINGS = {
+    GUILD_ID: "1380978534167613611",            // ID de ton serveur Discord
+    ABSENCE_ROLE_ID: "1498241578416734308",   // ID du rôle Absent
+    LOG_CHANNEL_ID: "1494594500511924425"     // ID du salon de logs
+};
 
 // 🔒 Middleware pour vérifier l'authentification
 const isAuthenticated = (req, res, next) => {
@@ -70,6 +75,23 @@ router.post("/", isAuthenticated, async (req, res) => {
             status: "ACTIVE"
         });
 
+        // ✅ AJOUT DU RÔLE SUR DISCORD IMMÉDIATEMENT
+        if (discordClient?.isReady()) {
+            try {
+                const guild = discordClient.guilds.cache.get(SETTINGS.GUILD_ID);
+                if (guild) {
+                    const member = await guild.members.fetch(req.user.discordId).catch(() => null);
+                    if (member) {
+                        await member.roles.add(SETTINGS.ABSENCE_ROLE_ID);
+                        logger.info(`✅ Rôle Absent ajouté via Dashboard à ${req.user.username}`);
+                    }
+                }
+            } catch (roleErr) {
+                logger.error(`Erreur rôle via Dashboard: ${roleErr.message}`);
+            }
+        }
+
+        // Notifications Dashboard pour les admins
         const admins = await StaffUser.find({ role: { $in: ["ADMIN", "SUPER_ADMIN"] } });
         const notifPromises = admins.map(admin => {
             return Notification.create({
@@ -83,9 +105,9 @@ router.post("/", isAuthenticated, async (req, res) => {
         });
         await Promise.all(notifPromises);
 
-        const LOG_CHANNEL_ID = process.env.ABSENCE_CHANNEL_ID || "1498217714919931915"; 
+        // Log Discord (Embed)
         if (discordClient?.isReady()) {
-            const channel = discordClient.channels.cache.get(LOG_CHANNEL_ID);
+            const channel = discordClient.channels.cache.get(SETTINGS.LOG_CHANNEL_ID);
             if (channel) {
                 const embed = new EmbedBuilder()
                     .setTitle('🌐 NOUVELLE ABSENCE (Dashboard)')
@@ -103,7 +125,7 @@ router.post("/", isAuthenticated, async (req, res) => {
             }
         }
 
-        res.status(201).json({ message: "Absence déclarée.", absence: newAbsence });
+        res.status(201).json({ message: "Absence déclarée et rôle appliqué.", absence: newAbsence });
 
     } catch (error) {
         logger.error(`Erreur POST /absences : ${error.message}`);
@@ -122,19 +144,26 @@ router.delete("/:id", isAuthenticated, async (req, res) => {
             return res.status(403).json({ error: "Non autorisé." });
         }
 
-        // ✅ Utilisation de la variable locale au lieu de CONFIG.ROLES
-        const guild = discordClient.guilds.cache.get(process.env.GUILD_ID);
-        const member = await guild?.members.fetch(absence.discordId).catch(() => null);
-        if (member && member.roles.cache.has(ABSENCE_ROLE_ID)) {
-            await member.roles.remove(ABSENCE_ROLE_ID).catch(() => {});
+        // ✅ RETRAIT DU RÔLE SUR DISCORD
+        if (discordClient?.isReady()) {
+            try {
+                const guild = discordClient.guilds.cache.get(SETTINGS.GUILD_ID);
+                const member = await guild?.members.fetch(absence.discordId).catch(() => null);
+                if (member && member.roles.cache.has(SETTINGS.ABSENCE_ROLE_ID)) {
+                    await member.roles.remove(SETTINGS.ABSENCE_ROLE_ID);
+                    logger.info(`✅ Rôle Absent retiré via Dashboard pour ${absence.username}`);
+                }
+            } catch (roleErr) {
+                logger.error(`Erreur retrait rôle Dashboard: ${roleErr.message}`);
+            }
         }
 
         absence.status = "ARCHIVED";
         await absence.save();
 
-        const LOG_CHANNEL_ID = process.env.ABSENCE_CHANNEL_ID || "1498217714919931915"; 
+        // Log Discord (Embed Retour)
         if (discordClient?.isReady()) {
-            const channel = discordClient.channels.cache.get(LOG_CHANNEL_ID);
+            const channel = discordClient.channels.cache.get(SETTINGS.LOG_CHANNEL_ID);
             if (channel) {
                 const embed = new EmbedBuilder()
                     .setTitle('🔙 RETOUR D\'ABSENCE (Dashboard)')
@@ -145,7 +174,7 @@ router.delete("/:id", isAuthenticated, async (req, res) => {
             }
         }
 
-        res.json({ message: "Absence archivée et rôle actualisé." });
+        res.json({ message: "Absence archivée et rôle retiré." });
     } catch (error) {
         logger.error(`Erreur DELETE /absences : ${error.message}`);
         res.status(500).json({ error: "Erreur lors de la suppression." });
