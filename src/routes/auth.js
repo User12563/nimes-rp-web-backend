@@ -8,11 +8,16 @@ import axios from "axios";
 
 const router = express.Router();
 
-const GUILD_ID = process.env.DISCORD_GUILD_ID || "1380978534167613611"; 
-const DISCORD_ROLES = {
-    SUPER_ADMIN: ["1492493841696034867", "1381159290030522459"], 
-    ADMIN: ["1381159291372830820"],                                 
-    MODERATEUR: ["1381159289179082752"]                            
+// ==========================================
+// 🛠️ CONFIGURATION DES IDS
+// ==========================================
+const SETTINGS = {
+    GUILD_ID: process.env.DISCORD_GUILD_ID || "1380978534167613611",
+    ROLES: {
+        SUPER_ADMIN: ["1492493841696034867", "1381159290030522459"], 
+        ADMIN: ["1381159291372830820"], 
+        MODERATEUR: ["1381159289179082752"]
+    }
 };
 
 passport.serializeUser((user, done) => done(null, user.id));
@@ -30,11 +35,11 @@ passport.use(new DiscordStrategy({
     clientSecret: process.env.DISCORD_CLIENT_SECRET,
     callbackURL: process.env.DISCORD_CALLBACK_URL,
     scope: ['identify', 'guilds'],
-    passReqToCallback: true // ✅ INDISPENSABLE pour récupérer l'IP via l'objet req
+    passReqToCallback: true 
 }, async (req, accessToken, refreshToken, profile, done) => {
     try {
-        const isOnGuild = profile.guilds.some(g => g.id === GUILD_ID);
-        if (!isOnGuild) return done(null, false, { message: "Vous n'êtes pas sur le serveur Nîmes-RP" });
+        const isOnGuild = profile.guilds.some(g => g.id === SETTINGS.GUILD_ID);
+        if (!isOnGuild) return done(null, false, { message: "Vous n'êtes pas sur le serveur." });
 
         // --- RÉCUPÉRATION DE L'IP ---
         const userIP = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
@@ -42,11 +47,11 @@ passport.use(new DiscordStrategy({
         const userRoles = await getMemberRoles(profile.id);
         let finalRole = null;
 
-        if (userRoles.some(r => DISCORD_ROLES.SUPER_ADMIN.includes(r))) {
+        if (userRoles.some(r => SETTINGS.ROLES.SUPER_ADMIN.includes(r))) {
             finalRole = "SUPER_ADMIN";
-        } else if (userRoles.some(r => DISCORD_ROLES.ADMIN.includes(r))) {
+        } else if (userRoles.some(r => SETTINGS.ROLES.ADMIN.includes(r))) {
             finalRole = "ADMIN";
-        } else if (userRoles.some(r => DISCORD_ROLES.MODERATEUR.includes(r))) {
+        } else if (userRoles.some(r => SETTINGS.ROLES.MODERATEUR.includes(r))) {
             finalRole = "MODERATEUR";
         }
 
@@ -78,7 +83,7 @@ passport.use(new DiscordStrategy({
             avatar: discordAvatarUrl,
             role: finalRole, 
             lastLogin: Date.now(),
-            lastServiceIP: userIP // ✅ SAUVEGARDE DE L'IP DANS LE MODÈLE
+            lastIP: userIP // ✅ CORRIGÉ : Utilise le nom exact du Schema (lastIP)
         };
 
         if (currentRobloxAvatar) {
@@ -130,9 +135,9 @@ router.get("/me", async (req, res) => {
         warns: user.warns || [],
         createdAt: user.createdAt,
         lastLogin: user.lastLogin,
-        lastServiceIP: user.lastServiceIP, // ✅ RENVOI DE L'IP AU DASHBOARD
-        totalServiceTime: user.totalServiceTime, // ✅ TEMPS TOTAL
-        weeklyServiceTime: user.weeklyServiceTime, // ✅ TEMPS HEBDO
+        lastIP: user.lastIP, // ✅ CORRIGÉ ICI AUSSI
+        totalServiceTime: user.totalServiceTime,
+        weeklyServiceTime: user.weeklyServiceTime,
         isBanned: user.isBanned,
         permissions: ROLE_PERMISSIONS[user.role] || []
     });
