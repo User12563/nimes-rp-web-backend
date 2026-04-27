@@ -1,21 +1,20 @@
-const { 
+import { 
     SlashCommandBuilder, 
     EmbedBuilder, 
     ActionRowBuilder, 
     ButtonBuilder, 
     ButtonStyle, 
     PermissionFlagsBits 
-} = require('discord.js');
+} from 'discord.js';
 
-module.exports = {
+export default {
     data: new SlashCommandBuilder()
         .setName('service-setup')
         .setDescription('Envoie le menu interactif de prise de service')
-        // On remplace Administrator par ManageGuild (Gérer le serveur)
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
 
     async execute(interaction) {
-        // L'embed reste le même, on est sur du visuel pro
+        // Création de l'Embed
         const embed = new EmbedBuilder()
             .setTitle('🕒 GESTION DU SERVICE STAFF')
             .setDescription(
@@ -28,6 +27,7 @@ module.exports = {
             .setFooter({ text: 'Nîmes RP • Pointage' })
             .setTimestamp();
 
+        // Création des boutons
         const buttons = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId('duty_on')
@@ -42,12 +42,13 @@ module.exports = {
                 .setEmoji('🔴')
         );
 
-        // On envoie une confirmation invisible pour les autres
+        // Confirmation pour l'admin (invisible pour les autres)
         await interaction.reply({
-            content: "✅ Le menu a été déployé dans ce salon.",
+            content: "✅ Le menu de service a été déployé avec succès.",
             ephemeral: true
         });
 
+        // Envoi du menu réel dans le salon
         await interaction.channel.send({
             embeds: [embed],
             components: [buttons]
