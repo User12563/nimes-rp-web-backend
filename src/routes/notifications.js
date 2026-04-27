@@ -1,7 +1,6 @@
 import express from "express";
 import Notification from "../models/Notification.js";
 import { auth as isAuthenticated } from "../middleware/auth.js";
-
 const router = express.Router();
 
 // --- RÉCUPÉRER LES NOTIFICATIONS ---
