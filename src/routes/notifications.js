@@ -1,38 +1,68 @@
 import express from "express";
 import Notification from "../models/Notification.js";
-import { auth } from "../middleware/auth.js";
+import { isAuthenticated } from "../middlewares/auth.js"; // Nom cohérent avec tes fichiers précédents
 
 const router = express.Router();
 
-// Récupérer toutes les notifications de l'utilisateur connecté
-router.get("/", auth, async (req, res) => {
+// --- RÉCUPÉRER LES NOTIFICATIONS ---
+router.get("/", isAuthenticated, async (req, res) => {
   try {
-    const notifications = await Notification.find({ userId: req.user.id })
+    // Note : On utilise req.user._id (l'ID MongoDB) et non le discordId
+    // car ton schéma Notification utilise un type ObjectId
+    const notifications = await Notification.find({ userId: req.user._id })
       .sort({ createdAt: -1 })
       .limit(50);
+      
     res.json(notifications);
   } catch (err) {
     res.status(500).json({ error: "Erreur lors de la récupération" });
   }
 });
 
-// Marquer une notification comme lue
-router.patch("/:id/read", auth, async (req, res) => {
+// --- MARQUER COMME LUE ---
+router.patch("/:id/read", isAuthenticated, async (req, res) => {
   try {
-    await Notification.findOneAndUpdate(
-      { _id: req.params.id, userId: req.user.id },
-      { read: true }
+    const notification = await Notification.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user._id },
+      { read: true },
+      { new: true }
     );
-    res.json({ success: true });
+
+    if (!notification) {
+      return res.status(404).json({ error: "Notification introuvable ou non autorisée" });
+    }
+
+    res.json({ success: true, notification });
   } catch (err) {
     res.status(500).json({ error: "Erreur lors de la mise à jour" });
   }
 });
 
-// Supprimer une notification
-router.delete("/:id", auth, async (req, res) => {
+// --- MARQUER TOUT COMME LU (Optionnel mais recommandé) ---
+router.post("/read-all", isAuthenticated, async (req, res) => {
   try {
-    await Notification.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
+    await Notification.updateMany(
+      { userId: req.user._id, read: false },
+      { read: true }
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Erreur lors de la mise à jour globale" });
+  }
+});
+
+// --- SUPPRIMER UNE NOTIFICATION ---
+router.delete("/:id", isAuthenticated, async (req, res) => {
+  try {
+    const result = await Notification.findOneAndDelete({ 
+      _id: req.params.id, 
+      userId: req.user._id 
+    });
+
+    if (!result) {
+      return res.status(404).json({ error: "Notification introuvable" });
+    }
+
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: "Erreur lors de la suppression" });
