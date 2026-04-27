@@ -170,7 +170,7 @@ const SETTINGS = {
 };
 
 // Cron Job : s'exécute toutes les 5 minutes
-cron.schedule("* * * * *", async () => { // Vérification chaque minute
+cron.schedule("*/5 * * * *", async () => {
     if (!discordClient?.isReady()) return;
 
     try {
