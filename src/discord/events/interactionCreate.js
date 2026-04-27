@@ -66,7 +66,6 @@ export default {
             // ✅ Mise à jour Rôle & Pseudo
             try { 
                 await member.roles.add(SETTINGS.ROLES.SERVICE); 
-                if (member.manageable) await member.setNickname(`[SERV] ${user.username}`);
                 logger.info(`✅ Service ON pour ${user.tag}`);
             } catch (e) { logger.error("Erreur roles/pseudo duty_on: " + e.message); }
 
@@ -87,7 +86,6 @@ export default {
             // ✅ Mise à jour Rôle & Pseudo
             try { 
                 await member.roles.remove(SETTINGS.ROLES.SERVICE); 
-                if (member.manageable) await member.setNickname(user.username.replace("[SERV] ", ""));
                 logger.info(`✅ Service OFF pour ${user.tag}`);
             } catch (e) { logger.error("Erreur roles/pseudo duty_off: " + e.message); }
             
