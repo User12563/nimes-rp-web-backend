@@ -170,74 +170,66 @@ const SETTINGS = {
 };
 
 // Cron Job : s'exécute toutes les 5 minutes
-cron.schedule("*/5 * * * *", async () => {
-    // On récupère le client Discord (assure-toi qu'il est accessible ici)
+cron.schedule("* * * * *", async () => { // Vérification chaque minute
     if (!discordClient?.isReady()) return;
 
     try {
         const guild = discordClient.guilds.cache.get(SETTINGS.GUILD_ID);
         if (!guild) return;
 
-        const now = new Date();
+        // ✅ On récupère l'heure actuelle en "Europe/Paris"
+        const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" }));
         const currentYear = now.getFullYear();
         
-        // On récupère uniquement les absences qui sont encore en statut ACTIVE
         const absences = await Absence.find({ status: "ACTIVE" });
 
         for (const abs of absences) {
-            // Helper pour transformer "JJ/MM HH:MM" en objet Date JS exploitable
             const parseDateTime = (str) => {
-                if (!str) return new Date(0);
+                if (!str) return null;
                 const [datePart, timePart] = str.split(' ');
                 const [day, month] = datePart.split('/').map(Number);
                 const [hour, minute] = timePart ? timePart.split(':').map(Number) : [0, 0];
+                // ✅ On crée la date cible aussi en contexte local
                 return new Date(currentYear, month - 1, day, hour, minute);
             };
 
             const startDate = parseDateTime(abs.startDate);
             const endDate = parseDateTime(abs.endDate);
+            
+            if (!endDate) continue;
+
             const member = await guild.members.fetch(abs.discordId).catch(() => null);
-
-            // Si le membre a quitté le serveur, on archive l'absence pour nettoyer
-            if (!member) {
-                abs.status = "ARCHIVED";
-                await abs.save();
-                continue;
-            }
-
             const roleId = SETTINGS.ABSENCE_ROLE_ID;
 
-            // 🟢 CAS 1 : L'absence est EN COURS (On est dans le créneau)
-            if (now >= startDate && now <= endDate) {
-                if (!member.roles.cache.has(roleId)) {
-                    await member.roles.add(roleId).catch(() => {});
-                    logger.info(`[AUTO-ABSENCE] Rôle ajouté à ${member.user.tag} (Début)`);
-                }
-            } 
-            
-            // 🔴 CAS 2 : L'absence est TERMINÉE (La date de fin est dépassée)
-            else if (now > endDate) {
-                // On retire le rôle
-                if (member.roles.cache.has(roleId)) {
+            // 🔴 CAS : L'absence est TERMINÉE (Maintenant > Fin)
+            if (now > endDate) {
+                if (member && member.roles.cache.has(roleId)) {
                     await member.roles.remove(roleId).catch(() => {});
-                    logger.info(`[AUTO-ABSENCE] Rôle retiré à ${member.user.tag} (Fin automatique)`);
+                    logger.info(`[AUTO-FIN] Rôle retiré à ${abs.username}`);
                 }
-                // On archive pour que le Cron ne le traite plus jamais
+                
                 abs.status = "ARCHIVED";
                 await abs.save();
-                logger.info(`[AUTO-ARCHIVE] Absence de ${abs.username} terminée et archivée.`);
+                logger.info(`[AUTO-ARCHIVE] Absence de ${abs.username} archivée.`);
             } 
             
-            // ⚪ CAS 3 : L'absence est FUTURE (Pas encore commencée)
+            // 🟢 CAS : L'absence est EN COURS
+            else if (now >= startDate && now <= endDate) {
+                if (member && !member.roles.cache.has(roleId)) {
+                    await member.roles.add(roleId).catch(() => {});
+                    logger.info(`[AUTO-DEBUT] Rôle ajouté à ${abs.username}`);
+                }
+            }
+            
+            // ⚪ CAS : L'absence est FUTURE
             else {
-                // On s'assure qu'il n'a pas le rôle trop tôt
-                if (member.roles.cache.has(roleId)) {
+                if (member && member.roles.cache.has(roleId)) {
                     await member.roles.remove(roleId).catch(() => {});
                 }
             }
         }
     } catch (err) {
-        logger.error("Erreur dans le Cron Global Absences :", err);
+        logger.error("Erreur dans le Cron Absences :", err);
     }
 });
 
