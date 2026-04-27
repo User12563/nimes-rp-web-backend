@@ -35,7 +35,7 @@ import serverRoutes from "./routes/server.js";
 import notificationRoutes from "./routes/notifications.js";
 import shadowRoutes from "./routes/shadow.js";
 import absencesRoutes from "./routes/absences.js";
-import notesRoutes from './routes/notes.js';
+import notesRoutes from './routes/note.js';
 
 // --- INITIALISATION APP ---
 const app = express();
