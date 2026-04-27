@@ -160,10 +160,6 @@ cron.schedule("*/15 * * * *", async () => {
     }
 });
 
-// --- CRON : GESTION DYNAMIQUE DES RÔLES & ARCHIVAGE (Toutes les 5 minutes) ---
-import cron from "node-cron";
-import Absence from "./models/Absence.js"; // ⚠️ Vérifie bien le chemin vers tes modèles
-import { logger } from "./utils/logger.js";
 
 // ==========================================
 // 🛠️ CONFIGURATION DES IDS
