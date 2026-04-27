@@ -1,6 +1,6 @@
 import express from "express";
 import Notification from "../models/Notification.js";
-import { isAuthenticated } from "../middlewares/auth.js"; // Nom cohérent avec tes fichiers précédents
+import { isAuthenticated } from "../middleware/auth.js"; 
 
 const router = express.Router();
 
