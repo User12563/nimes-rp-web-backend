@@ -1,13 +1,16 @@
 import express from "express";
 import Absence from "../models/Absence.js";
-import Notification from "../models/Notification.js"; // ✅ Import des notifications
-import StaffUser from "../models/StaffUser.js"; // ✅ Import pour cibler les Admins
+import Notification from "../models/Notification.js";
+import StaffUser from "../models/StaffUser.js";
 import { client as discordClient } from "../discord/index.js";
 import { EmbedBuilder } from "discord.js";
 import { logger } from "../utils/logger.js";
-import { CONFIG } from "../config.js";
+// ✅ Import supprimé car le fichier n'existe pas
 
 const router = express.Router();
+
+// ID du rôle Absence (on le prend dans le .env ou on met l'ID direct)
+const ABSENCE_ROLE_ID = process.env.ABSENCE_ROLE_ID || "1498241578416734308";
 
 // 🔒 Middleware pour vérifier l'authentification
 const isAuthenticated = (req, res, next) => {
@@ -67,7 +70,6 @@ router.post("/", isAuthenticated, async (req, res) => {
             status: "ACTIVE"
         });
 
-        // ✅ NOTIFICATION DASHBOARD pour les Admins
         const admins = await StaffUser.find({ role: { $in: ["ADMIN", "SUPER_ADMIN"] } });
         const notifPromises = admins.map(admin => {
             return Notification.create({
@@ -81,8 +83,7 @@ router.post("/", isAuthenticated, async (req, res) => {
         });
         await Promise.all(notifPromises);
 
-        // --- LOG DISCORD ---
-        const LOG_CHANNEL_ID = process.env.ABSENCE_CHANNEL_ID || "1494594500511924425"; 
+        const LOG_CHANNEL_ID = process.env.ABSENCE_CHANNEL_ID || "1498217714919931915"; 
         if (discordClient?.isReady()) {
             const channel = discordClient.channels.cache.get(LOG_CHANNEL_ID);
             if (channel) {
@@ -117,24 +118,21 @@ router.delete("/:id", isAuthenticated, async (req, res) => {
 
         if (!absence) return res.status(404).json({ error: "Introuvable." });
         
-        // Seul le propriétaire ou un SUPER_ADMIN peut supprimer
         if (absence.discordId !== req.user.discordId && req.user.role !== "SUPER_ADMIN") {
             return res.status(403).json({ error: "Non autorisé." });
         }
 
-        // ✅ Retrait du rôle Discord si l'absence était active (Optionnel mais propre)
+        // ✅ Utilisation de la variable locale au lieu de CONFIG.ROLES
         const guild = discordClient.guilds.cache.get(process.env.GUILD_ID);
         const member = await guild?.members.fetch(absence.discordId).catch(() => null);
-        if (member && member.roles.cache.has(CONFIG.ROLES.ABSENCE)) {
-            await member.roles.remove(CONFIG.ROLES.ABSENCE).catch(() => {});
+        if (member && member.roles.cache.has(ABSENCE_ROLE_ID)) {
+            await member.roles.remove(ABSENCE_ROLE_ID).catch(() => {});
         }
 
-        // On Archive au lieu de supprimer pour garder une trace en DB
         absence.status = "ARCHIVED";
         await absence.save();
 
-        // --- LOG DISCORD ---
-        const LOG_CHANNEL_ID = process.env.ABSENCE_CHANNEL_ID || "1494594500511924425"; 
+        const LOG_CHANNEL_ID = process.env.ABSENCE_CHANNEL_ID || "1498217714919931915"; 
         if (discordClient?.isReady()) {
             const channel = discordClient.channels.cache.get(LOG_CHANNEL_ID);
             if (channel) {
