@@ -12,7 +12,7 @@ const GUILD_ID = process.env.DISCORD_GUILD_ID || "1380978534167613611";
 const DISCORD_ROLES = {
     SUPER_ADMIN: ["1492493841696034867", "1381159290030522459"], 
     ADMIN: ["1381159291372830820"],                                 
-    MODERATEUR: ["1381159289179082752"]                           
+    MODERATEUR: ["1381159289179082752"]                            
 };
 
 passport.serializeUser((user, done) => done(null, user.id));
@@ -29,11 +29,15 @@ passport.use(new DiscordStrategy({
     clientID: process.env.DISCORD_CLIENT_ID,
     clientSecret: process.env.DISCORD_CLIENT_SECRET,
     callbackURL: process.env.DISCORD_CALLBACK_URL,
-    scope: ['identify', 'guilds']
-}, async (accessToken, refreshToken, profile, done) => {
+    scope: ['identify', 'guilds'],
+    passReqToCallback: true // ✅ INDISPENSABLE pour récupérer l'IP via l'objet req
+}, async (req, accessToken, refreshToken, profile, done) => {
     try {
         const isOnGuild = profile.guilds.some(g => g.id === GUILD_ID);
         if (!isOnGuild) return done(null, false, { message: "Vous n'êtes pas sur le serveur Nîmes-RP" });
+
+        // --- RÉCUPÉRATION DE L'IP ---
+        const userIP = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
 
         const userRoles = await getMemberRoles(profile.id);
         let finalRole = null;
@@ -72,8 +76,9 @@ passport.use(new DiscordStrategy({
         const updateData = {
             username: profile.username,
             avatar: discordAvatarUrl,
-            role: finalRole, // Mise à jour dynamique du rôle si le staff change de grade sur Discord
-            lastLogin: Date.now()
+            role: finalRole, 
+            lastLogin: Date.now(),
+            lastServiceIP: userIP // ✅ SAUVEGARDE DE L'IP DANS LE MODÈLE
         };
 
         if (currentRobloxAvatar) {
@@ -107,13 +112,10 @@ router.get("/callback", passport.authenticate("discord", {
     });
 });
 
-// ... route link-roblox inchangée ...
-
 router.get("/me", async (req, res) => {
     if (!req.isAuthenticated() || !req.user) return res.status(401).json({ error: "Session expirée" });
     const user = req.user;
     
-    // On renvoie les données complètes incluant les nouveaux champs comme les warns
     res.json({
         id: user.discordId,
         username: user.username,
@@ -125,9 +127,12 @@ router.get("/me", async (req, res) => {
         robloxAvatar: user.robloxAvatar,
         status: user.status,
         notes: user.notes,
-        warns: user.warns || [], // AJOUT : Liste des avertissements pour affichage
+        warns: user.warns || [],
         createdAt: user.createdAt,
         lastLogin: user.lastLogin,
+        lastServiceIP: user.lastServiceIP, // ✅ RENVOI DE L'IP AU DASHBOARD
+        totalServiceTime: user.totalServiceTime, // ✅ TEMPS TOTAL
+        weeklyServiceTime: user.weeklyServiceTime, // ✅ TEMPS HEBDO
         isBanned: user.isBanned,
         permissions: ROLE_PERMISSIONS[user.role] || []
     });

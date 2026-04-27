@@ -51,7 +51,30 @@ const staffUserSchema = new mongoose.Schema({
 
     // --- STATISTIQUES & SUIVI ---
     lastLogin: { type: Date, default: Date.now },
-    isBanned: { type: Boolean, default: false }
+    isBanned: { type: Boolean, default: false },
+
+    // --- SYSTÈME DE POINTAGE (SERVICE) ---
+    currentServiceStart: { 
+        type: Date, 
+        default: null 
+    }, // Stocke l'heure du clic sur "Prise de service"
+    
+    totalServiceTime: { 
+        type: Number, 
+        default: 0 
+    }, // Temps total en minutes (ou millisecondes) accumulé
+    
+    weeklyServiceTime: { 
+        type: Number, 
+        default: 0 
+    }, // Temps accumulé pour la semaine en cours (utile pour les quotas)
+
+    lastServiceEnd: { 
+        type: Date, 
+        default: null 
+    }, // Date de la dernière fin de service
+
+    lastIP: { type: String }, 
     
 }, { timestamps: true });
 
