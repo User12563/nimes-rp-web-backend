@@ -169,9 +169,24 @@ export default {
 
         // --- MENU RP ---
         if (customId === "rp_menu_select") {
-          const collabState = await getCollabState();
-          let selected = values[0] === "accueil" ? null : values[0];
-          return interaction.reply({ embeds: [getEmbedForCategory(selected, collabState)], ephemeral: true });
+            // Si l'utilisateur a choisi "État des services" dans le menu déroulant
+            if (values[0] === "etat") {
+                // Optionnel : Tu peux soit renvoyer l'embed de stats, 
+                // soit rediriger vers le formulaire d'absence ici si c'est ce que tu souhaites.
+                const collabState = await getCollabState();
+                return interaction.reply({ 
+                    embeds: [getEmbedForCategory("etat", collabState)], 
+                    ephemeral: true 
+                });
+            }
+
+            // Logique classique pour les autres rubriques (Accueil, Lexique, etc.)
+            const collabState = await getCollabState();
+            let selected = values[0] === "accueil" ? null : values[0];
+            return interaction.reply({ 
+                embeds: [getEmbedForCategory(selected, collabState)], 
+                ephemeral: true 
+            });
         }
 
         // --- MENU HIÉRARCHIE ---
