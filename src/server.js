@@ -161,23 +161,37 @@ cron.schedule("*/15 * * * *", async () => {
 });
 
 // --- CRON : GESTION DYNAMIQUE DES RÔLES & ARCHIVAGE (Toutes les 5 minutes) ---
+import cron from "node-cron";
+import Absence from "./models/Absence.js"; // ⚠️ Vérifie bien le chemin vers tes modèles
+import { logger } from "./utils/logger.js";
+
+// ==========================================
+// 🛠️ CONFIGURATION DES IDS
+// ==========================================
+const SETTINGS = {
+    GUILD_ID: "1380978534167613611",         // Ton ID serveur
+    ABSENCE_ROLE_ID: "1498241578416734308"   // Ton ID rôle absent
+};
+
+// Cron Job : s'exécute toutes les 5 minutes
 cron.schedule("*/5 * * * *", async () => {
+    // On récupère le client Discord (assure-toi qu'il est accessible ici)
     if (!discordClient?.isReady()) return;
 
     try {
-        // Remplace par ton ID de serveur ou utilise process.env.GUILD_ID
-        const guild = discordClient.guilds.cache.get(process.env.GUILD_ID || "TON_ID_GUILD");
+        const guild = discordClient.guilds.cache.get(SETTINGS.GUILD_ID);
         if (!guild) return;
 
         const now = new Date();
         const currentYear = now.getFullYear();
         
-        // On récupère uniquement les absences qui ne sont pas encore archivées
+        // On récupère uniquement les absences qui sont encore en statut ACTIVE
         const absences = await Absence.find({ status: "ACTIVE" });
 
         for (const abs of absences) {
-            // Helper pour transformer "JJ/MM HH:MM" en objet Date JS
+            // Helper pour transformer "JJ/MM HH:MM" en objet Date JS exploitable
             const parseDateTime = (str) => {
+                if (!str) return new Date(0);
                 const [datePart, timePart] = str.split(' ');
                 const [day, month] = datePart.split('/').map(Number);
                 const [hour, minute] = timePart ? timePart.split(':').map(Number) : [0, 0];
@@ -188,41 +202,41 @@ cron.schedule("*/5 * * * *", async () => {
             const endDate = parseDateTime(abs.endDate);
             const member = await guild.members.fetch(abs.discordId).catch(() => null);
 
-            // Si le membre a quitté le serveur, on archive l'absence pour nettoyer la DB
+            // Si le membre a quitté le serveur, on archive l'absence pour nettoyer
             if (!member) {
                 abs.status = "ARCHIVED";
                 await abs.save();
                 continue;
             }
 
-            const roleId = CONFIG.ROLES.ABSENCE;
+            const roleId = SETTINGS.ABSENCE_ROLE_ID;
 
-            // 🟢 CAS 1 : L'absence est EN COURS (On est entre le début et la fin)
+            // 🟢 CAS 1 : L'absence est EN COURS (On est dans le créneau)
             if (now >= startDate && now <= endDate) {
                 if (!member.roles.cache.has(roleId)) {
-                    await member.roles.add(roleId);
-                    logger.info(`[ABSENCE] Rôle ajouté à ${member.user.tag} (Début d'absence)`);
+                    await member.roles.add(roleId).catch(() => {});
+                    logger.info(`[AUTO-ABSENCE] Rôle ajouté à ${member.user.tag} (Début)`);
                 }
             } 
             
-            // 🔴 CAS 2 : L'absence est TERMINÉE (La date de fin est passée)
+            // 🔴 CAS 2 : L'absence est TERMINÉE (La date de fin est dépassée)
             else if (now > endDate) {
-                // On retire le rôle s'il l'a encore
+                // On retire le rôle
                 if (member.roles.cache.has(roleId)) {
-                    await member.roles.remove(roleId);
-                    logger.info(`[ABSENCE] Rôle retiré à ${member.user.tag} (Fin d'absence)`);
+                    await member.roles.remove(roleId).catch(() => {});
+                    logger.info(`[AUTO-ABSENCE] Rôle retiré à ${member.user.tag} (Fin automatique)`);
                 }
-                // On archive l'absence pour qu'elle ne soit plus traitée par ce Cron
+                // On archive pour que le Cron ne le traite plus jamais
                 abs.status = "ARCHIVED";
                 await abs.save();
-                logger.info(`[ARCHIVE] Absence de ${abs.username} archivée automatiquement.`);
+                logger.info(`[AUTO-ARCHIVE] Absence de ${abs.username} terminée et archivée.`);
             } 
             
-            // ⚪ CAS 3 : L'absence est FUTURE (On n'est pas encore à la date de début)
+            // ⚪ CAS 3 : L'absence est FUTURE (Pas encore commencée)
             else {
-                // On s'assure qu'il n'a pas le rôle par erreur
+                // On s'assure qu'il n'a pas le rôle trop tôt
                 if (member.roles.cache.has(roleId)) {
-                    await member.roles.remove(roleId);
+                    await member.roles.remove(roleId).catch(() => {});
                 }
             }
         }
