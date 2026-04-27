@@ -1,6 +1,6 @@
 import express from 'express';
 const router = express.Router();
-import { isAuthenticated } from '../middlewares/auth.js';
+import { isAuthenticated } from '../middleware/auth.js';
 import StaffUser from '../models/StaffUser.js';
 import Notification from '../models/Notification.js'; // ✅ Import du modèle
 import { logger } from '../utils/logger.js';
